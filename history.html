@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <title>History</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="hist">
+    <div class="app-wrap">
+      <header class="site-header">
+        <div class="site-header-inner">
+          <a class="brand" href="index.html">
+            <img class="brand-logo" src="assets/logo.png" alt="" width="40" height="40" />
+            <span data-i18n="brandTitle">Income calculator</span>
+          </a>
+          <button
+            type="button"
+            class="menu-toggle"
+            id="menuToggle"
+            data-i18n-aria="ariaOpenMenu"
+            aria-label="Open menu"
+            aria-expanded="false"
+            aria-controls="appDrawer"
+          >
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <h1 data-i18n="titleHist">History</h1>
+        <p class="lead" data-i18n="leadHist">Work log with TT%, CC%, KRA%, group, and pay — same layout in PDF export.</p>
+
+        <div class="card" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center">
+          <button type="button" class="primary" id="btnPdf" data-i18n="btnPdf">Download PDF</button>
+          <span id="histCount" style="color: var(--muted); font-size: 0.9rem"></span>
+        </div>
+
+        <div class="card card--table">
+          <div class="table-wrap">
+            <table class="data" id="histTable">
+              <thead>
+                <tr>
+                  <th data-i18n="thDate">Date</th>
+                  <th class="num" data-i18n="thHours">Hours</th>
+                  <th class="num" data-i18n="thMins">Mins</th>
+                  <th class="num" data-i18n="thCalls">Calls</th>
+                  <th class="num" data-i18n="thTT">TT%</th>
+                  <th class="num" data-i18n="thCC">CC%</th>
+                  <th class="num" data-i18n="thKRA">KRA%</th>
+                  <th class="num" data-i18n="thGroup">Group</th>
+                  <th class="num" data-i18n="thPay">Pay (₹)</th>
+                </tr>
+              </thead>
+              <tbody id="histBody"></tbody>
+            </table>
+          </div>
+          <div class="history-summary" id="histSummary" hidden>
+            <span
+              ><span data-i18n="totalEarningsLbl">Total Earnings:</span> <strong id="histTotalPay">₹0</strong></span
+            >
+            <span><span data-i18n="totalDaysLbl">Total Days:</span> <strong id="histTotalDays">0</strong></span>
+          </div>
+          <p class="empty" id="histEmpty" hidden data-i18n="emptyHist">No saved entries yet. Use the Calculator page to save a day.</p>
+        </div>
+      </main>
+
+      <footer class="site-footer">
+        <p class="footer-legal">
+          © <span id="footerYear"></span> @shubh sharma<sup class="reg">®</sup>
+        </p>
+      </footer>
+    </div>
+
+    <div class="drawer-overlay" id="drawerOverlay" aria-hidden="true"></div>
+    <aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="Side menu">
+      <div class="drawer-header">
+        <span data-i18n="navMenu">Menu</span>
+        <button type="button" class="drawer-close" id="drawerClose" data-i18n-aria="ariaCloseMenu" aria-label="Close menu">×</button>
+      </div>
+      <nav class="drawer-nav" aria-label="Sections">
+        <a href="calendar.html" data-i18n="navCalendar">Calendar</a>
+        <a href="history.html" aria-current="page" data-i18n="navHistory">History</a>
+        <a href="tds.html" data-i18n="navTds">TDS</a>
+        <a href="settings.html" data-i18n="navSettings">Settings</a>
+      </nav>
+    </aside>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
+    <script src="js/calculations.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/theme.js"></script>
+    <script>
+      applyThemeFromStorage();
+      applyI18n();
+
+      /** jsPDF default Helvetica = WinAnsi only — avoid Unicode (Rs., copyright) */
+      function formatInrPdf(n) {
+        var x = Math.round(Number(n));
+        if (!Number.isFinite(x)) x = 0;
+        return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      }
+
+      function pdfTimestampAscii() {
+        var d = new Date();
+        function z(n) {
+          return n < 10 ? '0' + n : '' + n;
+        }
+        return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+      }
+
+      function render() {
+        const entries = getAllEntriesSorted();
+        const tbody = document.getElementById('histBody');
+        const empty = document.getElementById('histEmpty');
+        const summary = document.getElementById('histSummary');
+        tbody.innerHTML = '';
+        document.getElementById('histCount').textContent = t('recordsCount', { n: entries.length });
+
+        if (entries.length === 0) {
+          empty.hidden = false;
+          summary.hidden = true;
+          return;
+        }
+        empty.hidden = true;
+        summary.hidden = false;
+
+        let totalPay = 0;
+        const dates = new Set();
+        for (const e of entries) {
+          const m = getEntryMetrics(e);
+          totalPay += Number(e.pay) || 0;
+          if (e.date) dates.add(e.date);
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td>' +
+            formatDatePretty(e.date) +
+            '</td>' +
+            '<td class="num">' +
+            e.hours +
+            '</td>' +
+            '<td class="num">' +
+            e.minutes +
+            '</td>' +
+            '<td class="num">' +
+            e.calls +
+            '</td>' +
+            '<td class="num">' +
+            formatPctOneDec(m.tt) +
+            '</td>' +
+            '<td class="num">' +
+            formatPctOneDec(m.cc) +
+            '</td>' +
+            '<td class="num">' +
+            formatPctOneDec(m.kra) +
+            '</td>' +
+            '<td class="num">' +
+            formatGroupShort(m.group) +
+            '</td>' +
+            '<td class="num num--pay">' +
+            Number(e.pay).toLocaleString('en-IN') +
+            '</td>';
+          tbody.appendChild(tr);
+        }
+        document.getElementById('histTotalPay').textContent = '₹ ' + totalPay.toLocaleString('en-IN');
+        document.getElementById('histTotalDays').textContent = String(dates.size);
+      }
+
+      function downloadPdf() {
+        const entries = getAllEntriesSorted();
+        if (!entries.length) {
+          alert(t('alertNoPdf'));
+          return;
+        }
+        const pdfNs = window.jspdf || {};
+        const JsPDF = pdfNs.jsPDF;
+        if (!JsPDF) {
+          alert(t('alertPdfLib'));
+          return;
+        }
+
+        const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+
+        const blue = [37, 99, 235];
+        doc.setFillColor(blue[0], blue[1], blue[2]);
+        doc.rect(0, 0, pageW, 24, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.text('Income history', 12, 15);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('Generated ' + pdfTimestampAscii(), pageW - 12, 15, { align: 'right' });
+
+        const body = entries.map(function (e) {
+          const m = getEntryMetrics(e);
+          return [
+            formatDatePretty(e.date),
+            String(e.hours),
+            String(e.minutes),
+            String(e.calls),
+            formatPctOneDec(m.tt),
+            formatPctOneDec(m.cc),
+            formatPctOneDec(m.kra),
+            formatGroupShort(m.group),
+            formatInrPdf(e.pay),
+          ];
+        });
+
+        if (typeof doc.autoTable !== 'function') {
+          alert(t('alertPdfTable'));
+          return;
+        }
+
+        const totalPay = entries.reduce(function (s, e) {
+          return s + (Number(e.pay) || 0);
+        }, 0);
+        const totalDays = new Set(
+          entries.map(function (e) {
+            return e.date;
+          })
+        ).size;
+
+        doc.autoTable({
+          startY: 28,
+          head: [['Date', 'Hours', 'Mins', 'Calls', 'TT%', 'CC%', 'KRA%', 'Group', 'Pay (Rs)']],
+          body: body,
+          theme: 'grid',
+          headStyles: {
+            fillColor: blue,
+            textColor: 255,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle',
+            fontSize: 8,
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          styles: {
+            fontSize: 8,
+            cellPadding: 2.8,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.1,
+            textColor: [15, 23, 42],
+            valign: 'middle',
+          },
+          columnStyles: {
+            0: { cellWidth: 28, halign: 'left' },
+            1: { halign: 'center', cellWidth: 14 },
+            2: { halign: 'center', cellWidth: 14 },
+            3: { halign: 'center', cellWidth: 16 },
+            4: { halign: 'center', cellWidth: 18 },
+            5: { halign: 'center', cellWidth: 18 },
+            6: { halign: 'center', cellWidth: 18 },
+            7: { halign: 'center', cellWidth: 22 },
+            8: { halign: 'right', fontStyle: 'bold', textColor: [29, 78, 216], cellWidth: 26 },
+          },
+          margin: { left: 10, right: 10, bottom: 14 },
+        });
+
+        var finalY = doc.lastAutoTable.finalY + 4;
+        if (finalY > pageH - 28) {
+          doc.addPage();
+          finalY = 18;
+        }
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.35);
+        doc.line(10, finalY, pageW - 10, finalY);
+        finalY += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        var totalLeft = 'Total Earnings: Rs. ' + formatInrPdf(totalPay);
+        var totalRight = 'Total Days: ' + totalDays;
+        doc.text(totalLeft, 12, finalY);
+        doc.text(totalRight, pageW - 12, finalY, { align: 'right' });
+        finalY += 8;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Copyright 2026 @shubh sharma', pageW / 2, finalY, { align: 'center' });
+
+        doc.save('income-history.pdf');
+      }
+
+      document.getElementById('btnPdf').addEventListener('click', downloadPdf);
+      render();
+    </script>
+    <script src="js/app-shell.js"></script>
+  </body>
+</html>

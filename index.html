@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <title>Daily pay — Income calculator</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="calc">
+    <div class="app-wrap">
+      <header class="site-header">
+        <div class="site-header-inner">
+          <a class="brand" href="index.html">
+            <img class="brand-logo" src="assets/logo.png" alt="" width="40" height="40" />
+            <span data-i18n="brandTitle">Income calculator</span>
+          </a>
+          <button
+            type="button"
+            class="menu-toggle"
+            id="menuToggle"
+            data-i18n-aria="ariaOpenMenu"
+            aria-label="Open menu"
+            aria-expanded="false"
+            aria-controls="appDrawer"
+          >
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <h1 data-i18n="titleCalc">Daily performance</h1>
+        <p class="lead" data-i18n="leadCalc">
+          Enter time and connected calls. Criteria is the divisor for CC% (e.g. 54 or 60). Max pay per day is ₹1100.
+        </p>
+
+        <div class="summary-strip" id="monthSummary">
+          <span
+            ><span data-i18n="monthTotalLabel">This month total:</span>
+            <strong id="monthTotal">₹0</strong></span
+          >
+        </div>
+
+        <div class="card">
+          <form id="calcForm" autocomplete="off">
+            <div class="row">
+              <div>
+                <label for="entryDate" data-i18n="labelDate">Date</label>
+                <input type="date" id="entryDate" required />
+              </div>
+              <div>
+                <label for="hours" data-i18n="labelHours">Hours (T Hour)</label>
+                <input type="number" id="hours" min="0" max="24" step="1" value="0" required />
+              </div>
+              <div>
+                <label for="minutes" data-i18n="labelMinutes">Minutes</label>
+                <input type="number" id="minutes" min="0" max="59" step="1" value="0" required />
+              </div>
+              <div>
+                <label for="calls" data-i18n="labelCalls">Connected calls</label>
+                <input type="number" id="calls" min="0" step="1" value="0" required />
+              </div>
+              <div>
+                <label for="criteria" data-i18n="labelCriteria">Criteria (1–100)</label>
+                <select id="criteria"></select>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button type="button" class="primary" id="btnCalc" data-i18n="btnCalculate">Calculate</button>
+              <button type="submit" class="primary" id="btnSave" data-i18n="btnSave">Save entry</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="results-panel">
+          <div class="results-panel-head">
+            <h2 data-i18n="resultsTitle">Results</h2>
+            <span class="results-badge" data-i18n="badgeLive">Live</span>
+          </div>
+          <div class="results-grid">
+            <div class="metric">
+              <span class="metric-label" data-i18n="ttPct">TT %</span>
+              <span class="metric-value" id="outTT">—</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label" data-i18n="ccPct">CC %</span>
+              <span class="metric-value" id="outCC">—</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label" data-i18n="kraPct">KRA %</span>
+              <span class="metric-value" id="outKRA">—</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label" data-i18n="group">Group</span>
+              <span class="metric-value" id="outGroup">—</span>
+            </div>
+            <div class="metric metric--wide">
+              <span class="metric-label" data-i18n="payINR">Pay (₹)</span>
+              <span class="metric-value metric-value--hero" id="outPay">—</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="site-footer">
+        <p class="footer-legal">
+          © <span id="footerYear"></span> @shubh sharma<sup class="reg">®</sup>
+        </p>
+      </footer>
+    </div>
+
+    <div class="drawer-overlay" id="drawerOverlay" aria-hidden="true"></div>
+    <aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="Side menu">
+      <div class="drawer-header">
+        <span data-i18n="navMenu">Menu</span>
+        <button type="button" class="drawer-close" id="drawerClose" data-i18n-aria="ariaCloseMenu" aria-label="Close menu">×</button>
+      </div>
+      <nav class="drawer-nav" aria-label="Sections">
+        <a href="calendar.html" data-i18n="navCalendar">Calendar</a>
+        <a href="history.html" data-i18n="navHistory">History</a>
+        <a href="tds.html" data-i18n="navTds">TDS</a>
+        <a href="settings.html" data-i18n="navSettings">Settings</a>
+      </nav>
+    </aside>
+
+    <script src="js/storage.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/calculations.js"></script>
+    <script src="js/theme.js"></script>
+    <script>
+      applyThemeFromStorage();
+      applyI18n();
+
+      (function initCriteria() {
+        const sel = document.getElementById('criteria');
+        for (let i = 1; i <= 100; i++) {
+          const o = document.createElement('option');
+          o.value = String(i);
+          o.textContent = String(i);
+          sel.appendChild(o);
+        }
+        const def = getSettings().defaultCriteria;
+        sel.value = String(Math.min(100, Math.max(1, def || 54)));
+      })();
+
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('entryDate').value = today;
+
+      let lastComputed = null;
+
+      function refreshMonthTotal() {
+        const now = new Date();
+        const total = sumPayForMonth(now.getFullYear(), now.getMonth());
+        document.getElementById('monthTotal').textContent = '₹' + total.toLocaleString('en-IN');
+      }
+
+      function runCalc() {
+        const hours = document.getElementById('hours').value;
+        const minutes = document.getElementById('minutes').value;
+        const calls = document.getElementById('calls').value;
+        const criteria = document.getElementById('criteria').value;
+        const r = computeAll(hours, minutes, calls, criteria);
+        lastComputed = r;
+        document.getElementById('outTT').textContent = formatPctOneDec(r.tt);
+        document.getElementById('outCC').textContent = formatPctOneDec(r.cc);
+        document.getElementById('outKRA').textContent = formatPctOneDec(r.kra);
+        document.getElementById('outGroup').textContent = formatGroupShort(r.group);
+        document.getElementById('outPay').textContent = '₹' + r.pay.toLocaleString('en-IN');
+      }
+
+      document.getElementById('btnCalc').addEventListener('click', runCalc);
+
+      document.getElementById('calcForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        runCalc();
+        if (!lastComputed) return;
+        const date = document.getElementById('entryDate').value;
+        const hours = Number(document.getElementById('hours').value);
+        const minutes = Number(document.getElementById('minutes').value);
+        const calls = Number(document.getElementById('calls').value);
+        const criteria = Number(document.getElementById('criteria').value);
+        addEntry({
+          date,
+          hours,
+          minutes,
+          calls,
+          criteria,
+          tt: lastComputed.tt,
+          cc: lastComputed.cc,
+          kra: lastComputed.kra,
+          group: lastComputed.group,
+          pay: lastComputed.pay,
+        });
+        updateSettings({ defaultCriteria: criteria });
+        refreshMonthTotal();
+        alert(t('alertEntrySaved'));
+      });
+
+      refreshMonthTotal();
+    </script>
+    <script src="js/app-shell.js"></script>
+  </body>
+</html>

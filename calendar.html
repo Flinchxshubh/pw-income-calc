@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <title>Calendar — Monthly pay</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-page="cal">
+    <div class="app-wrap">
+      <header class="site-header">
+        <div class="site-header-inner">
+          <a class="brand" href="index.html">
+            <img class="brand-logo" src="assets/logo.png" alt="" width="40" height="40" />
+            <span data-i18n="brandTitle">Income calculator</span>
+          </a>
+          <button
+            type="button"
+            class="menu-toggle"
+            id="menuToggle"
+            data-i18n-aria="ariaOpenMenu"
+            aria-label="Open menu"
+            aria-expanded="false"
+            aria-controls="appDrawer"
+          >
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+            <span class="menu-toggle-bar" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <h1 data-i18n="titleCal">Monthly calendar</h1>
+        <p class="lead" data-i18n="leadCal">Daily pay per saved entry (₹). Multiple entries on the same day are summed.</p>
+
+        <div class="calendar-toolbar card">
+          <button type="button" id="prevM" aria-label="Previous month">←</button>
+          <span id="monthLabel" style="font-weight: 600"></span>
+          <button type="button" id="nextM" aria-label="Next month">→</button>
+          <span style="margin-left: auto; white-space: nowrap"
+            ><span data-i18n="monthTotalCalPrefix">Month total:</span> <strong id="monthTotal">₹0</strong></span
+          >
+        </div>
+
+        <div class="card cal-wrap">
+          <div class="cal-grid" id="calHead"></div>
+          <div class="cal-grid" id="calBody" style="margin-top: 4px"></div>
+        </div>
+      </main>
+
+      <footer class="site-footer">
+        <p class="footer-legal">
+          © <span id="footerYear"></span> @shubh sharma<sup class="reg">®</sup>
+        </p>
+      </footer>
+    </div>
+
+    <div class="drawer-overlay" id="drawerOverlay" aria-hidden="true"></div>
+    <aside class="app-drawer" id="appDrawer" aria-hidden="true" aria-label="Side menu">
+      <div class="drawer-header">
+        <span data-i18n="navMenu">Menu</span>
+        <button type="button" class="drawer-close" id="drawerClose" data-i18n-aria="ariaCloseMenu" aria-label="Close menu">×</button>
+      </div>
+      <nav class="drawer-nav" aria-label="Sections">
+        <a href="calendar.html" aria-current="page" data-i18n="navCalendar">Calendar</a>
+        <a href="history.html" data-i18n="navHistory">History</a>
+        <a href="tds.html" data-i18n="navTds">TDS</a>
+        <a href="settings.html" data-i18n="navSettings">Settings</a>
+      </nav>
+    </aside>
+
+    <script src="js/storage.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/theme.js"></script>
+    <script>
+      applyThemeFromStorage();
+      applyI18n();
+
+      let view = new Date();
+      view.setDate(1);
+
+      const weekKeys = ['weekSun', 'weekMon', 'weekTue', 'weekWed', 'weekThu', 'weekFri', 'weekSat'];
+
+      function render() {
+        const y = view.getFullYear();
+        const m = view.getMonth();
+        document.getElementById('monthLabel').textContent = view.toLocaleString(localeForApp(), {
+          month: 'long',
+          year: 'numeric',
+        });
+        const total = sumPayForMonth(y, m);
+        document.getElementById('monthTotal').textContent = '₹' + total.toLocaleString('en-IN');
+
+        const payMap = getPayMapForMonth(y, m);
+        const head = document.getElementById('calHead');
+        head.innerHTML = '';
+        weekKeys.forEach(function (key) {
+          const el = document.createElement('div');
+          el.className = 'cal-head';
+          el.textContent = t(key);
+          head.appendChild(el);
+        });
+
+        const body = document.getElementById('calBody');
+        body.innerHTML = '';
+        const firstDay = new Date(y, m, 1).getDay();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+        for (let i = 0; i < firstDay; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'cal-cell out';
+          body.appendChild(cell);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const cell = document.createElement('div');
+          cell.className = 'cal-cell';
+          const dateStr =
+            y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+          const pay = payMap[dateStr] || 0;
+          cell.innerHTML =
+            '<div class="day-num">' +
+            day +
+            '</div>' +
+            (pay > 0 ? '<div class="day-pay">₹' + pay.toLocaleString('en-IN') + '</div>' : '');
+          body.appendChild(cell);
+        }
+      }
+
+      document.getElementById('prevM').addEventListener('click', function () {
+        view.setMonth(view.getMonth() - 1);
+        render();
+      });
+      document.getElementById('nextM').addEventListener('click', function () {
+        view.setMonth(view.getMonth() + 1);
+        render();
+      });
+
+      render();
+    </script>
+    <script src="js/app-shell.js"></script>
+  </body>
+</html>
